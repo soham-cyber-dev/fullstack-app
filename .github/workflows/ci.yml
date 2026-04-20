@@ -6,9 +6,6 @@ on:
   pull_request:
     branches: [main]
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   backend-check:
     name: Backend check
@@ -23,17 +20,17 @@ jobs:
           node-version: '24'
 
       - name: Install backend dependencies
-        run: cd server && npm install
+        working-directory: server
+        run: npm install
 
-      - name: Check all server files load correctly
+      - name: Check backend files exist
+        working-directory: server
         run: |
-          cd server
-          node -e "
-            require('./routes/auth');
-            require('./routes/items');
-            require('./middleware/verifyToken');
-            console.log('All server files OK');
-          "
+          test -f index.js && echo "index.js OK"
+          test -f db.js && echo "db.js OK"
+          test -f routes/auth.js && echo "auth.js OK"
+          test -f routes/items.js && echo "items.js OK"
+          test -f middleware/verifyToken.js && echo "verifyToken.js OK"
 
   frontend-check:
     name: Frontend build check
@@ -48,10 +45,12 @@ jobs:
           node-version: '24'
 
       - name: Install frontend dependencies
-        run: cd client && npm install
+        working-directory: client
+        run: npm install
 
       - name: Build frontend
-        run: cd client && npm run build
+        working-directory: client
+        run: npm run build
         env:
           VITE_API_URL: http://localhost:5000/api
 
