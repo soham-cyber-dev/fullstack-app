@@ -46,13 +46,17 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: client
-        run: npm install
+        run: npm install --legacy-peer-deps
+
+      - name: Fix vite permissions
+        run: chmod +x client/node_modules/.bin/vite || true
 
       - name: Build frontend
         working-directory: client
-        run: npx vite build
+        run: node node_modules/vite/bin/vite.js build
         env:
           VITE_API_URL: http://localhost:5000/api
 
       - name: Confirm build output exists
-        run: ls client/dist/
+        working-directory: client
+        run: ls dist/
