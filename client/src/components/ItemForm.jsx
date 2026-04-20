@@ -1,10 +1,13 @@
 import { useState } from "react";
 import api from "../api/axios";
 
+const CATEGORIES = ["General", "Work", "Personal", "Ideas", "Important"];
+
 export default function ItemForm({ editItem, onSuccess, onCancel }) {
   const [form, setForm] = useState({
     title: editItem?.title || "",
     description: editItem?.description || "",
+    category: editItem?.category || "General",
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -62,6 +65,18 @@ export default function ItemForm({ editItem, onSuccess, onCancel }) {
             className="input-field w-full rounded-xl px-4 py-3 text-sm"
             placeholder="Enter item title"
           />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-2" style={{color:'rgba(148,163,184,0.9)'}}>Category</label>
+          <select
+            name="category" value={form.category}
+            onChange={handleChange}
+            className="input-field w-full rounded-xl px-4 py-3 text-sm"
+            style={{background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)',color:'#e2e8f0'}}>
+            {CATEGORIES.map(cat => (
+              <option key={cat} value={cat} style={{background:'#1a1a2e',color:'#e2e8f0'}}>{cat}</option>
+            ))}
+          </select>
         </div>
         <div>
           <label className="block text-sm font-medium mb-2" style={{color:'rgba(148,163,184,0.9)'}}>Description</label>

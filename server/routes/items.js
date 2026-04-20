@@ -8,14 +8,33 @@ router.get('/', async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
-    const result = await pool.query(
-      'SELECT * FROM items WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3',
-      [req.user.id, limit, offset]
-    );
-    const countResult = await pool.query(
-      'SELECT COUNT(*) FROM items WHERE user_id = $1',
-      [req.user.id]
-    );
+    const search = req.query.search || '';
+    const category = req.query.category || '';
+
+    let query = 'SELECT * FROM items WHERE user_id = $1';
+    let params = [req.user.id];
+    let paramCount = 1;
+
+    if (search) {
+      paramCount++;
+      query += ` AND (title ILIKE $${paramCount} OR description ILIKE $${paramCount})`;
+      params.push(`%${search}%`);
+    }
+
+    if (category) {
+      paramCount++;
+      query += ` AND category = $${paramCount}`;
+      params.push(category);
+    }
+
+    const countQuery = query.replace('SELECT *', 'SELECT COUNT(*)');
+    const countResult = await pool.query(countQuery, params);
+
+    query += ` ORDER BY created_at DESC LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}`;
+    params.push(limit, offset);
+
+    const result = await pool.query(query, params);
+
     res.json({
       data: result.rows,
       total: parseInt(countResult.rows[0].count),
@@ -53,14 +72,15 @@ router.post('/',
     if (!errors.isEmpty()) {
       return res.status(400).json({ error: errors.array()[0].msg });
     }
-    const { title, description } = req.body;
+    const { title, description, category } = req.body;
     try {
       const result = await pool.query(
-        'INSERT INTO items (user_id, title, description) VALUES ($1, $2, $3) RETURNING *',
-        [req.user.id, title, description || '']
+        'INSERT INTO items (user_id, title, description, category) VALUES ($1, $2, $3, $4) RETURNING *',
+        [req.user.id, title, description || '', category || 'General']
       );
       res.status(201).json({ data: result.rows[0], message: 'Item created.' });
     } catch (err) {
+      console.error(err);
       res.status(500).json({ error: 'Failed to create item.' });
     }
   }
@@ -73,7 +93,7 @@ router.put('/:id',
     if (!errors.isEmpty()) {
       return res.status(400).json({ error: errors.array()[0].msg });
     }
-    const { title, description } = req.body;
+    const { title, description, category } = req.body;
     try {
       const check = await pool.query(
         'SELECT id FROM items WHERE id = $1 AND user_id = $2',
@@ -83,8 +103,8 @@ router.put('/:id',
         return res.status(404).json({ error: 'Item not found.' });
       }
       const result = await pool.query(
-        'UPDATE items SET title = $1, description = $2, updated_at = NOW() WHERE id = $3 RETURNING *',
-        [title, description || '', req.params.id]
+        'UPDATE items SET title = $1, description = $2, category = $3, updated_at = NOW() WHERE id = $4 RETURNING *',
+        [title, description || '', category || 'General', req.params.id]
       );
       res.json({ data: result.rows[0], message: 'Item updated.' });
     } catch (err) {
