@@ -4,19 +4,24 @@ require('dotenv').config();
 
 const app = express();
 
-const allowedOrigins = [
-  'http://localhost:5173',
-  process.env.FRONTEND_URL,
-].filter(Boolean);
-
 app.use(cors({
   origin: function(origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (!origin) return callback(null, true);
+    const allowed = [
+      'http://localhost:5173',
+      'http://localhost:3000',
+    ];
+    if (
+      allowed.includes(origin) ||
+      origin.endsWith('.vercel.app') ||
+      origin === process.env.FRONTEND_URL
+    ) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
     }
-  }
+  },
+  credentials: true,
 }));
 
 app.use(express.json());
