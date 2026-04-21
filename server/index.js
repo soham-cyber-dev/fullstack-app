@@ -28,6 +28,7 @@ app.use(express.json());
 
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/items', require('./middleware/verifyToken'), require('./routes/items'));
+app.use('/api/profile', require('./middleware/verifyToken'), require('./routes/profile'));
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 

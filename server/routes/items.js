@@ -11,29 +11,31 @@ router.get('/', async (req, res) => {
     const search = req.query.search || '';
     const category = req.query.category || '';
 
-    let query = 'SELECT * FROM items WHERE user_id = $1';
+    let conditions = ['user_id = $1'];
     let params = [req.user.id];
-    let paramCount = 1;
 
     if (search) {
-      paramCount++;
-      query += ` AND (title ILIKE $${paramCount} OR description ILIKE $${paramCount})`;
       params.push(`%${search}%`);
+      conditions.push(`(title ILIKE $${params.length} OR description ILIKE $${params.length})`);
     }
 
     if (category) {
-      paramCount++;
-      query += ` AND category = $${paramCount}`;
       params.push(category);
+      conditions.push(`category = $${params.length}`);
     }
 
-    const countQuery = query.replace('SELECT *', 'SELECT COUNT(*)');
-    const countResult = await pool.query(countQuery, params);
+    const whereClause = conditions.join(' AND ');
 
-    query += ` ORDER BY created_at DESC LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}`;
+    const countResult = await pool.query(
+      `SELECT COUNT(*) FROM items WHERE ${whereClause}`,
+      params
+    );
+
     params.push(limit, offset);
-
-    const result = await pool.query(query, params);
+    const result = await pool.query(
+      `SELECT * FROM items WHERE ${whereClause} ORDER BY created_at DESC LIMIT $${params.length - 1} OFFSET $${params.length}`,
+      params
+    );
 
     res.json({
       data: result.rows,
