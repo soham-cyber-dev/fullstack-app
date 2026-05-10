@@ -2,9 +2,10 @@ const express = require('express');
 const router = express.Router();
 const { body, validationResult } = require('express-validator');
 const pool = require('../db');
-const { upload, deleteImage } = require('../middleware/upload');
+const { getUpload, deleteImage } = require('../middleware/upload');
 
 const handleUpload = (req, res, next) => {
+  const upload = getUpload();
   upload.single('image')(req, res, (err) => {
     if (err) {
       if (err.code === 'LIMIT_FILE_SIZE') {
@@ -38,7 +39,6 @@ router.get('/', async (req, res) => {
     }
 
     const whereClause = conditions.join(' AND ');
-
     const countResult = await pool.query(
       `SELECT COUNT(*) FROM items WHERE ${whereClause}`,
       params
@@ -85,11 +85,11 @@ router.post('/', handleUpload,
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      if (req.file) await deleteImage(req.file.path);
+      if (req.file?.path) await deleteImage(req.file.path);
       return res.status(400).json({ error: errors.array()[0].msg });
     }
     const { title, description, category } = req.body;
-    const image_url = req.file ? req.file.path : null;
+    const image_url = req.file?.path || null;
     try {
       const result = await pool.query(
         'INSERT INTO items (user_id, title, description, category, image_url) VALUES ($1, $2, $3, $4, $5) RETURNING *',
@@ -109,7 +109,7 @@ router.put('/:id', handleUpload,
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      if (req.file) await deleteImage(req.file.path);
+      if (req.file?.path) await deleteImage(req.file.path);
       return res.status(400).json({ error: errors.array()[0].msg });
     }
     const { title, description, category } = req.body;
@@ -119,13 +119,12 @@ router.put('/:id', handleUpload,
         [req.params.id, req.user.id]
       );
       if (check.rows.length === 0) {
-        if (req.file) await deleteImage(req.file.path);
+        if (req.file?.path) await deleteImage(req.file.path);
         return res.status(404).json({ error: 'Item not found.' });
       }
 
       let image_url = check.rows[0].image_url;
-
-      if (req.file) {
+      if (req.file?.path) {
         if (image_url) await deleteImage(image_url);
         image_url = req.file.path;
       }
