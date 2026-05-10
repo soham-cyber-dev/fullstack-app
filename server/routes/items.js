@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { body, validationResult } = require('express-validator');
 const pool = require('../db');
+const { upload, cloudinary } = require('../middleware/upload');
 
 router.get('/', async (req, res) => {
   try {
@@ -25,7 +26,6 @@ router.get('/', async (req, res) => {
     }
 
     const whereClause = conditions.join(' AND ');
-
     const countResult = await pool.query(
       `SELECT COUNT(*) FROM items WHERE ${whereClause}`,
       params
@@ -65,6 +65,7 @@ router.get('/:id', async (req, res) => {
 });
 
 router.post('/',
+  upload.single('image'),
   [
     body('title').notEmpty().withMessage('Title is required'),
     body('title').isLength({ max: 255 }).withMessage('Title too long'),
@@ -75,10 +76,11 @@ router.post('/',
       return res.status(400).json({ error: errors.array()[0].msg });
     }
     const { title, description, category } = req.body;
+    const image_url = req.file ? req.file.path : null;
     try {
       const result = await pool.query(
-        'INSERT INTO items (user_id, title, description, category) VALUES ($1, $2, $3, $4) RETURNING *',
-        [req.user.id, title, description || '', category || 'General']
+        'INSERT INTO items (user_id, title, description, category, image_url) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        [req.user.id, title, description || '', category || 'General', image_url]
       );
       res.status(201).json({ data: result.rows[0], message: 'Item created.' });
     } catch (err) {
@@ -89,6 +91,7 @@ router.post('/',
 );
 
 router.put('/:id',
+  upload.single('image'),
   [body('title').notEmpty().withMessage('Title is required')],
   async (req, res) => {
     const errors = validationResult(req);
@@ -98,18 +101,30 @@ router.put('/:id',
     const { title, description, category } = req.body;
     try {
       const check = await pool.query(
-        'SELECT id FROM items WHERE id = $1 AND user_id = $2',
+        'SELECT * FROM items WHERE id = $1 AND user_id = $2',
         [req.params.id, req.user.id]
       );
       if (check.rows.length === 0) {
         return res.status(404).json({ error: 'Item not found.' });
       }
+
+      let image_url = check.rows[0].image_url;
+
+      if (req.file) {
+        if (image_url) {
+          const publicId = image_url.split('/').pop().split('.')[0];
+          await cloudinary.uploader.destroy(`fullstack-app/${publicId}`).catch(() => {});
+        }
+        image_url = req.file.path;
+      }
+
       const result = await pool.query(
-        'UPDATE items SET title = $1, description = $2, category = $3, updated_at = NOW() WHERE id = $4 RETURNING *',
-        [title, description || '', category || 'General', req.params.id]
+        'UPDATE items SET title = $1, description = $2, category = $3, image_url = $4, updated_at = NOW() WHERE id = $5 RETURNING *',
+        [title, description || '', category || 'General', image_url, req.params.id]
       );
       res.json({ data: result.rows[0], message: 'Item updated.' });
     } catch (err) {
+      console.error(err);
       res.status(500).json({ error: 'Failed to update item.' });
     }
   }
@@ -118,12 +133,18 @@ router.put('/:id',
 router.delete('/:id', async (req, res) => {
   try {
     const check = await pool.query(
-      'SELECT id FROM items WHERE id = $1 AND user_id = $2',
+      'SELECT * FROM items WHERE id = $1 AND user_id = $2',
       [req.params.id, req.user.id]
     );
     if (check.rows.length === 0) {
       return res.status(404).json({ error: 'Item not found.' });
     }
+
+    if (check.rows[0].image_url) {
+      const publicId = check.rows[0].image_url.split('/').pop().split('.')[0];
+      await cloudinary.uploader.destroy(`fullstack-app/${publicId}`).catch(() => {});
+    }
+
     await pool.query('DELETE FROM items WHERE id = $1', [req.params.id]);
     res.json({ message: 'Item deleted.' });
   } catch (err) {
