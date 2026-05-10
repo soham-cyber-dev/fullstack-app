@@ -30,7 +30,7 @@ export default function ItemForm({ editItem, onSuccess, onCancel }) {
 
   const removeImage = () => {
     setImage(null);
-    setPreview(null);
+    setPreview(editItem?.image_url || null);
   };
 
   const handleSubmit = async (e) => {
@@ -42,16 +42,14 @@ export default function ItemForm({ editItem, onSuccess, onCancel }) {
       formData.append("title", form.title);
       formData.append("description", form.description);
       formData.append("category", form.category);
-      if (image) formData.append("image", image);
+      if (image) {
+        formData.append("image", image);
+      }
 
       if (editItem) {
-        await api.put(`/items/${editItem.id}`, formData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
+        await api.put(`/items/${editItem.id}`, formData);
       } else {
-        await api.post("/items", formData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
+        await api.post("/items", formData);
       }
       onSuccess();
     } catch (err) {
@@ -80,7 +78,8 @@ export default function ItemForm({ editItem, onSuccess, onCancel }) {
       </div>
 
       {error && (
-        <div className="mb-4 p-3 rounded-xl text-sm" style={{background:'rgba(239,68,68,0.1)',border:'1px solid rgba(239,68,68,0.3)',color:'#fca5a5'}}>
+        <div className="mb-4 p-3 rounded-xl text-sm"
+          style={{background:'rgba(239,68,68,0.1)',border:'1px solid rgba(239,68,68,0.3)',color:'#fca5a5'}}>
           {error}
         </div>
       )}
@@ -114,24 +113,28 @@ export default function ItemForm({ editItem, onSuccess, onCancel }) {
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-2" style={{color:'rgba(148,163,184,0.9)'}}>Image</label>
+          <label className="block text-sm font-medium mb-2" style={{color:'rgba(148,163,184,0.9)'}}>
+            Image <span style={{color:'rgba(148,163,184,0.4)',fontWeight:'normal'}}>(optional)</span>
+          </label>
           {preview ? (
-            <div className="relative rounded-xl overflow-hidden" style={{border:'1px solid rgba(255,255,255,0.1)'}}>
+            <div className="relative rounded-xl overflow-hidden"
+              style={{border:'1px solid rgba(255,255,255,0.1)'}}>
               <img src={preview} alt="Preview"
                 className="w-full object-cover" style={{maxHeight:'180px'}} />
               <button type="button" onClick={removeImage}
-                className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center"
+                className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center text-xs"
                 style={{background:'rgba(0,0,0,0.7)',color:'white',border:'1px solid rgba(255,255,255,0.2)'}}>
                 ✕
               </button>
             </div>
           ) : (
-            <label className="flex flex-col items-center justify-center rounded-xl cursor-pointer transition-all duration-200 py-6"
+            <label
+              className="flex flex-col items-center justify-center rounded-xl cursor-pointer py-6 transition-all duration-200"
               style={{border:'1px dashed rgba(99,102,241,0.4)',background:'rgba(99,102,241,0.05)'}}
               onMouseEnter={e => e.currentTarget.style.background='rgba(99,102,241,0.1)'}
               onMouseLeave={e => e.currentTarget.style.background='rgba(99,102,241,0.05)'}>
               <svg width="24" height="24" fill="none" stroke="#818cf8" strokeWidth="1.5" viewBox="0 0 24 24" className="mb-2">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                <rect x="3" y="3" width="18" height="18" rx="2"/>
                 <circle cx="8.5" cy="8.5" r="1.5"/>
                 <polyline points="21 15 16 10 5 21"/>
               </svg>

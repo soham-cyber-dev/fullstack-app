@@ -2,7 +2,19 @@ const express = require('express');
 const router = express.Router();
 const { body, validationResult } = require('express-validator');
 const pool = require('../db');
-const { upload, cloudinary } = require('../middleware/upload');
+const { upload, deleteImage } = require('../middleware/upload');
+
+const handleUpload = (req, res, next) => {
+  upload.single('image')(req, res, (err) => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ error: 'Image must be under 5MB.' });
+      }
+      return res.status(400).json({ error: err.message || 'Image upload failed.' });
+    }
+    next();
+  });
+};
 
 router.get('/', async (req, res) => {
   try {
@@ -26,6 +38,7 @@ router.get('/', async (req, res) => {
     }
 
     const whereClause = conditions.join(' AND ');
+
     const countResult = await pool.query(
       `SELECT COUNT(*) FROM items WHERE ${whereClause}`,
       params
@@ -64,8 +77,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-router.post('/',
-  upload.single('image'),
+router.post('/', handleUpload,
   [
     body('title').notEmpty().withMessage('Title is required'),
     body('title').isLength({ max: 255 }).withMessage('Title too long'),
@@ -73,6 +85,7 @@ router.post('/',
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      if (req.file) await deleteImage(req.file.path);
       return res.status(400).json({ error: errors.array()[0].msg });
     }
     const { title, description, category } = req.body;
@@ -84,18 +97,19 @@ router.post('/',
       );
       res.status(201).json({ data: result.rows[0], message: 'Item created.' });
     } catch (err) {
+      if (image_url) await deleteImage(image_url);
       console.error(err);
       res.status(500).json({ error: 'Failed to create item.' });
     }
   }
 );
 
-router.put('/:id',
-  upload.single('image'),
+router.put('/:id', handleUpload,
   [body('title').notEmpty().withMessage('Title is required')],
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      if (req.file) await deleteImage(req.file.path);
       return res.status(400).json({ error: errors.array()[0].msg });
     }
     const { title, description, category } = req.body;
@@ -105,16 +119,14 @@ router.put('/:id',
         [req.params.id, req.user.id]
       );
       if (check.rows.length === 0) {
+        if (req.file) await deleteImage(req.file.path);
         return res.status(404).json({ error: 'Item not found.' });
       }
 
       let image_url = check.rows[0].image_url;
 
       if (req.file) {
-        if (image_url) {
-          const publicId = image_url.split('/').pop().split('.')[0];
-          await cloudinary.uploader.destroy(`fullstack-app/${publicId}`).catch(() => {});
-        }
+        if (image_url) await deleteImage(image_url);
         image_url = req.file.path;
       }
 
@@ -139,12 +151,9 @@ router.delete('/:id', async (req, res) => {
     if (check.rows.length === 0) {
       return res.status(404).json({ error: 'Item not found.' });
     }
-
     if (check.rows[0].image_url) {
-      const publicId = check.rows[0].image_url.split('/').pop().split('.')[0];
-      await cloudinary.uploader.destroy(`fullstack-app/${publicId}`).catch(() => {});
+      await deleteImage(check.rows[0].image_url);
     }
-
     await pool.query('DELETE FROM items WHERE id = $1', [req.params.id]);
     res.json({ message: 'Item deleted.' });
   } catch (err) {
