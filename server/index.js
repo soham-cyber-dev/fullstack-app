@@ -7,15 +7,8 @@ const app = express();
 app.use(cors({
   origin: function(origin, callback) {
     if (!origin) return callback(null, true);
-    const allowed = [
-      'http://localhost:5173',
-      'http://localhost:3000',
-    ];
-    if (
-      allowed.includes(origin) ||
-      origin.endsWith('.vercel.app') ||
-      origin === process.env.FRONTEND_URL
-    ) {
+    const allowed = ['http://localhost:5173', 'http://localhost:3000'];
+    if (allowed.includes(origin) || origin.endsWith('.vercel.app') || origin === process.env.FRONTEND_URL) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
@@ -24,12 +17,7 @@ app.use(cors({
   credentials: true,
 }));
 
-app.use((req, res, next) => {
-  if (req.is('multipart/form-data')) {
-    return next();
-  }
-  express.json()(req, res, next);
-});
+app.use(express.json());
 
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/items', require('./middleware/verifyToken'), require('./routes/items'));

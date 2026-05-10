@@ -38,18 +38,23 @@ export default function ItemForm({ editItem, onSuccess, onCancel }) {
     setError("");
     setLoading(true);
     try {
-      const formData = new FormData();
-      formData.append("title", form.title);
-      formData.append("description", form.description);
-      formData.append("category", form.category);
       if (image) {
+        const formData = new FormData();
+        formData.append("title", form.title);
+        formData.append("description", form.description);
+        formData.append("category", form.category);
         formData.append("image", image);
-      }
-
-      if (editItem) {
-        await api.put(`/items/${editItem.id}`, formData);
+        if (editItem) {
+          await api.put(`/items/${editItem.id}`, formData);
+        } else {
+          await api.post("/items", formData);
+        }
       } else {
-        await api.post("/items", formData);
+        if (editItem) {
+          await api.put(`/items/${editItem.id}`, form);
+        } else {
+          await api.post("/items", form);
+        }
       }
       onSuccess();
     } catch (err) {
