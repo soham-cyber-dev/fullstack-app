@@ -2,10 +2,9 @@ const express = require('express');
 const router = express.Router();
 const { body, validationResult } = require('express-validator');
 const pool = require('../db');
-const { getUpload, deleteImage } = require('../middleware/upload');
+const { upload, uploadToCloudinary, deleteImage } = require('../middleware/upload');
 
 const handleUpload = (req, res, next) => {
-  const upload = getUpload();
   upload.single('image')(req, res, (err) => {
     if (err) {
       if (err.code === 'LIMIT_FILE_SIZE') {
@@ -85,19 +84,25 @@ router.post('/', handleUpload,
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      if (req.file?.path) await deleteImage(req.file.path);
       return res.status(400).json({ error: errors.array()[0].msg });
     }
+
     const { title, description, category } = req.body;
-    const image_url = req.file?.path || null;
+    let image_url = null;
+
     try {
+      if (req.file) {
+        const result = await uploadToCloudinary(req.file.buffer);
+        image_url = result.secure_url;
+      }
+
       const result = await pool.query(
         'INSERT INTO items (user_id, title, description, category, image_url) VALUES ($1, $2, $3, $4, $5) RETURNING *',
         [req.user.id, title, description || '', category || 'General', image_url]
       );
+
       res.status(201).json({ data: result.rows[0], message: 'Item created.' });
     } catch (err) {
-      if (image_url) await deleteImage(image_url);
       console.error(err);
       res.status(500).json({ error: 'Failed to create item.' });
     }
@@ -109,30 +114,33 @@ router.put('/:id', handleUpload,
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      if (req.file?.path) await deleteImage(req.file.path);
       return res.status(400).json({ error: errors.array()[0].msg });
     }
+
     const { title, description, category } = req.body;
+
     try {
       const check = await pool.query(
         'SELECT * FROM items WHERE id = $1 AND user_id = $2',
         [req.params.id, req.user.id]
       );
       if (check.rows.length === 0) {
-        if (req.file?.path) await deleteImage(req.file.path);
         return res.status(404).json({ error: 'Item not found.' });
       }
 
       let image_url = check.rows[0].image_url;
-      if (req.file?.path) {
+
+      if (req.file) {
         if (image_url) await deleteImage(image_url);
-        image_url = req.file.path;
+        const uploaded = await uploadToCloudinary(req.file.buffer);
+        image_url = uploaded.secure_url;
       }
 
       const result = await pool.query(
         'UPDATE items SET title = $1, description = $2, category = $3, image_url = $4, updated_at = NOW() WHERE id = $5 RETURNING *',
         [title, description || '', category || 'General', image_url, req.params.id]
       );
+
       res.json({ data: result.rows[0], message: 'Item updated.' });
     } catch (err) {
       console.error(err);
