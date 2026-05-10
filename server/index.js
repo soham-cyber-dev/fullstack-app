@@ -2,13 +2,24 @@ const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 
+const requiredEnvVars = ['DATABASE_URL', 'JWT_SECRET'];
+const missingVars = requiredEnvVars.filter(v => !process.env[v]);
+if (missingVars.length > 0) {
+  console.error('Missing required environment variables:', missingVars.join(', '));
+  process.exit(1);
+}
+
 const app = express();
 
 app.use(cors({
   origin: function(origin, callback) {
     if (!origin) return callback(null, true);
     const allowed = ['http://localhost:5173', 'http://localhost:3000'];
-    if (allowed.includes(origin) || origin.endsWith('.vercel.app') || origin === process.env.FRONTEND_URL) {
+    if (
+      allowed.includes(origin) ||
+      origin.endsWith('.vercel.app') ||
+      origin === process.env.FRONTEND_URL
+    ) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
